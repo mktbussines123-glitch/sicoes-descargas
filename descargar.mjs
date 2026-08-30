@@ -107,7 +107,9 @@ for (const f of filas) {
     const a = archivos[i];
     const key = `${f.cuce}::${a.label}::${i}`;
 
-    if (!CFG.force && manifest[key]) { console.log(`    ⟳ ya estaba: ${manifest[key].file}`); nSkip++; continue; }
+    // Verificar si el archivo existe en disco (no solo en manifiesto)
+    const fileExists = manifest[key] && fs.existsSync(path.join(CFG.out, manifest[key].file));
+    if (!CFG.force && fileExists) { console.log(`    ⟳ ya estaba: ${manifest[key].file}`); nSkip++; continue; }
     if (CFG.dryRun)                  { console.log(`    · (dry-run) ${a.label}`);            continue; }
 
     try {
