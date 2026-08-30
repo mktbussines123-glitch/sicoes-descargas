@@ -5,13 +5,16 @@ on:
     # Todos los días a las 6am Bolivia (UTC-4 = 10:00 UTC)
     - cron: '0 10 * * *'
   
-  # Permitir ejecución manual desde GitHub
   workflow_dispatch:
     inputs:
       limite:
-        description: 'Número máximo de convocatorias a procesar'
+        description: 'Número máximo de convocatorias (0 = todas)'
         required: false
-        default: '50'
+        default: '0'
+      solo_dbc:
+        description: 'Solo DBC (true/false)'
+        required: false
+        default: 'false'
 
 permissions:
   contents: write
@@ -35,23 +38,33 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
       
-      - name: Install xvfb (virtual display)
+      - name: Install xvfb
         run: sudo apt-get update && sudo apt-get install -y xvfb
       
-      - name: Run scraper with virtual display
+      - name: Run scraper
         run: |
-          # xvfb simula un monitor virtual para que Turnstile funcione
+          # Si limite es 0, descargar todas las vigentes
+          LIMIT_FLAG=""
+          if [ "${{ github.event.inputs.limite || '0' }}" != "0" ]; then
+            LIMIT_FLAG="--limit ${{ github.event.inputs.limite }}"
+          fi
+          
+          # Si solo_dbc es true, agregar flag
+          DBC_FLAG=""
+          if [ "${{ github.event.inputs.solo_dbc || 'false' }}" = "true" ]; then
+            DBC_FLAG="--solo-dbc"
+          fi
+          
           xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" \
             node descargar.mjs \
-            --limit ${{ github.event.inputs.limite || '50' }} \
-            --solo-dbc \
+            $LIMIT_FLAG \
+            $DBC_FLAG \
             --out ./descargas
       
       - name: Commit and push changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          ls -la descargas/
           git add descargas/
           git status
           git diff --staged --quiet || git commit -m "📊 Scraping diario $(date +'%Y-%m-%d')"
