@@ -290,7 +290,9 @@ async function descargar(pg, sesion, fileId, fila, label, idx) {
 
       const sugerido = dl.suggestedFilename() || 'archivo';
       const ext = (path.extname(sugerido) || '.bin').toLowerCase();
-      const fname = `${fila.cuce}__${slug(label)}${idx ? '_' + idx : ''}${ext}`;
+      // Incluir objeto de contratación en el nombre del archivo
+      const objetoSlug = slug(fila.objeto?.substring(0, 50) || 'sin-objeto');
+      const fname = `${fila.cuce}__${objetoSlug}__${slug(label)}${ext}`;
       const full = path.join(CFG.out, fname);
       await dl.saveAs(full);
 
