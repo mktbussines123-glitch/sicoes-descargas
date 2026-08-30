@@ -1,0 +1,24 @@
+{
+  "name": "sicoes-descargas",
+  "version": "1.0.0",
+  "description": "Descarga masiva de documentos (DBC, especificaciones, planos, etc.) de las convocatorias del SICOES (Bolivia).",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "sicoes-descargas": "descargar.mjs"
+  },
+  "scripts": {
+    "start": "node descargar.mjs",
+    "postinstall": "playwright install chromium"
+  },
+  "dependencies": {
+    "playwright": "^1.47.0"
+  },
+  "optionalDependencies": {
+    "mammoth": "^1.8.0",
+    "pdf-parse": "^1.1.1"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

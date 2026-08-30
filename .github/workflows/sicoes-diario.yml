@@ -1,0 +1,53 @@
+name: SICOES - Scraping Diario
+
+on:
+  schedule:
+    # Todos los días a las 6am Bolivia (UTC-4 = 10:00 UTC)
+    - cron: '0 10 * * *'
+  
+  # Permitir ejecución manual desde GitHub
+  workflow_dispatch:
+    inputs:
+      limite:
+        description: 'Número máximo de convocatorias a procesar'
+        required: false
+        default: '50'
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+      
+      - name: Install xvfb (virtual display)
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+      
+      - name: Run scraper with virtual display
+        run: |
+          # xvfb simula un monitor virtual para que Turnstile funcione
+          xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" \
+            node descargar.mjs \
+            --limit ${{ github.event.inputs.limite || '50' }} \
+            --solo-dbc \
+            --out ./descargas
+      
+      - name: Commit and push changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add descargas/ || true
+          git diff --staged --quiet || git commit -m "📊 Scraping diario $(date +'%Y-%m-%d')"
+          git push

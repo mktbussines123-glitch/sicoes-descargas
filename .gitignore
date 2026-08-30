@@ -1,0 +1,8 @@
+node_modules/
+descargas/
+anpp/
+.perfil-navegador/
+*.log
+_check_dns.js
+_test_*.js
+_debug_*.js
