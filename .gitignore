@@ -8,3 +8,5 @@ _debug_*.js
 descargas/*.docx
 descargas/*.pdf
 descargas/*.txt
+descargas/_manifest.json
+descargas/_listado.json
