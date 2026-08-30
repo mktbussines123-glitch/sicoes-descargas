@@ -71,6 +71,25 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
+      - name: Clean old releases (>7 days)
+        run: |
+          echo "Limpiando releases antiguas..."
+          SEVEN_DAYS_AGO=$(date -d "7 days ago" +%s)
+          
+          gh release list --repo "${{ github.repository }}" --limit 100 --json tagName,publishedAt -q '.[] | "\(.tagName) \(.publishedAt)"' | while read TAG DATE; do
+            # Convertir fecha a timestamp
+            RELEASE_DATE=$(date -d "$DATE" +%s 2>/dev/null || echo "0")
+            
+            if [ "$RELEASE_DATE" -lt "$SEVEN_DAYS_AGO" ] && [ "$RELEASE_DATE" -gt "0" ]; then
+              echo "Eliminando release antigua: $TAG"
+              gh release delete "$TAG" --repo "${{ github.repository }}" --yes --cleanup-tag
+            fi
+          done
+          
+          echo "Limpieza completada"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
       - name: Commit metadata only
         run: |
           git config user.name "github-actions[bot]"
