@@ -14,6 +14,10 @@ on:
 permissions:
   contents: write
 
+env:
+  TELEGRAM_TOKEN: '8667911135:AAGZ6z_0Sd2A9fZJHC2fhbMVW64vu5ekX5g'
+  TELEGRAM_CHAT_ID: '5705229538'
+
 jobs:
   scrape:
     runs-on: ubuntu-latest
@@ -37,6 +41,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y xvfb
       
       - name: Run scraper
+        id: scraper
         run: |
           sleep $((RANDOM % 120))
           xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" \
@@ -45,6 +50,47 @@ jobs:
             --solo-dbc \
             --delay 8000 \
             --out ./descargas
+          
+          # Contar archivos descargados
+          FILES=$(ls -1 descargas/*.docx descargas/*.pdf 2>/dev/null | wc -l)
+          echo "files_downloaded=$FILES" >> $GITHUB_OUTPUT
+          
+          # Verificar errores
+          if [ -f descargas/_errores.json ]; then
+            ERRORS=$(cat descargas/_errores.json | grep -c "error" || echo "0")
+            echo "errors=$ERRORS" >> $GITHUB_OUTPUT
+          else
+            echo "errors=0" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Send Telegram alert - Success
+        if: success()
+        run: |
+          MESSAGE="✅ *SICOES Scraping Completado*
+
+📊 *Archivos descargados:* ${{ steps.scraper.outputs.files_downloaded }}
+❌ *Errores:* ${{ steps.scraper.outputs.errors }}
+⏰ *Fecha:* $(date +'%Y-%m-%d %H:%M UTC')
+🔗 *Ver releases:* https://github.com/${{ github.repository }}/releases"
+          
+          curl -s -X POST "https://api.telegram.org/bot${{ env.TELEGRAM_TOKEN }}/sendMessage" \
+            -d chat_id="${{ env.TELEGRAM_CHAT_ID }}" \
+            -d parse_mode="Markdown" \
+            -d text="$MESSAGE"
+      
+      - name: Send Telegram alert - Failure
+        if: failure()
+        run: |
+          MESSAGE="❌ *SICOES Scraping Falló*
+
+⚠️ *Error en el workflow*
+📅 *Fecha:* $(date +'%Y-%m-%d %H:%M UTC')
+🔗 *Ver logs:* https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          
+          curl -s -X POST "https://api.telegram.org/bot${{ env.TELEGRAM_TOKEN }}/sendMessage" \
+            -d chat_id="${{ env.TELEGRAM_CHAT_ID }}" \
+            -d parse_mode="Markdown" \
+            -d text="$MESSAGE"
       
       - name: Create Release and upload files
         if: success()
@@ -52,13 +98,11 @@ jobs:
           TAG="scraping-$(date +%Y%m%d-%H%M%S)"
           TITLE="📊 Scraping $(date +'%Y-%m-%d %H:%M')"
           
-          # Crear release
           gh release create "$TAG" \
             --repo "${{ github.repository }}" \
             --title "$TITLE" \
             --notes "Archivos descargados del SICOES - Run #${{ github.run_number }}"
           
-          # Subir archivos uno por uno
           for f in descargas/*.docx descargas/*.pdf descargas/*.txt; do
             if [ -f "$f" ]; then
               echo "Subiendo: $f"
@@ -66,7 +110,6 @@ jobs:
             fi
           done
           
-          # Subir metadata
           gh release upload "$TAG" descargas/_listado.json descargas/_manifest.json --repo "${{ github.repository }}" --clobber
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -77,7 +120,6 @@ jobs:
           SEVEN_DAYS_AGO=$(date -d "7 days ago" +%s)
           
           gh release list --repo "${{ github.repository }}" --limit 100 --json tagName,publishedAt -q '.[] | "\(.tagName) \(.publishedAt)"' | while read TAG DATE; do
-            # Convertir fecha a timestamp
             RELEASE_DATE=$(date -d "$DATE" +%s 2>/dev/null || echo "0")
             
             if [ "$RELEASE_DATE" -lt "$SEVEN_DAYS_AGO" ] && [ "$RELEASE_DATE" -gt "0" ]; then
@@ -89,6 +131,20 @@ jobs:
           echo "Limpieza completada"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Send Telegram alert - Cleanup
+        if: success()
+        run: |
+          MESSAGE="🧹 *Limpieza Completada*
+
+Releases antiguas eliminadas (>7 días)
+📦 *Archivos en release actual:* ${{ steps.scraper.outputs.files_downloaded }}
+✅ *Sistema funcionando correctamente*"
+          
+          curl -s -X POST "https://api.telegram.org/bot${{ env.TELEGRAM_TOKEN }}/sendMessage" \
+            -d chat_id="${{ env.TELEGRAM_CHAT_ID }}" \
+            -d parse_mode="Markdown" \
+            -d text="$MESSAGE"
       
       - name: Commit metadata only
         run: |
