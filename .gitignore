@@ -5,3 +5,6 @@ anpp/
 _check_dns.js
 _test_*.js
 _debug_*.js
+descargas/*.docx
+descargas/*.pdf
+descargas/*.txt
