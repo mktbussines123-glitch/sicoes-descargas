@@ -2,7 +2,6 @@ name: SICOES - Scraping Diario
 
 on:
   schedule:
-    # Cada 6 horas: 12am, 6am, 12pm, 6pm (hora Bolivia)
     - cron: '0 4,10,16,22 * * *'
   
   workflow_dispatch:
@@ -39,9 +38,7 @@ jobs:
       
       - name: Run scraper
         run: |
-          # Delay aleatorio inicial (0-120 segundos) para parecer humano
           sleep $((RANDOM % 120))
-          
           xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" \
             node descargar.mjs \
             --limit ${{ github.event.inputs.limite || '20' }} \
@@ -49,11 +46,26 @@ jobs:
             --delay 8000 \
             --out ./descargas
       
-      - name: Commit and push changes
+      - name: Create Release with files
+        if: success()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "scraping-${{ github.run_id }}"
+          name: "📊 Scraping ${{ github.run_number }}"
+          body: "Archivos descargados del SICOES"
+          files: descargas/*.docx descargas/*.pdf descargas/*.txt descargas/_listado.json descargas/_manifest.json
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Commit metadata only
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add descargas/
-          git status
-          git diff --staged --quiet || git commit -m "📊 Scraping $(date +'%Y-%m-%d %H:%M')"
+          mkdir -p descargas_meta
+          cp descargas/_listado.json descargas_meta/ 2>/dev/null || true
+          cp descargas/_manifest.json descargas_meta/ 2>/dev/null || true
+          git add descargas_meta/
+          git diff --staged --quiet || git commit -m "Metadata $(date +'%Y-%m-%d %H:%M')"
           git push
