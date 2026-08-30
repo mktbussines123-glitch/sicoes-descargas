@@ -46,16 +46,28 @@ jobs:
             --delay 8000 \
             --out ./descargas
       
-      - name: Create Release with files
+      - name: Create Release and upload files
         if: success()
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: "scraping-${{ github.run_id }}"
-          name: "📊 Scraping ${{ github.run_number }}"
-          body: "Archivos descargados del SICOES"
-          files: descargas/*.docx descargas/*.pdf descargas/*.txt descargas/_listado.json descargas/_manifest.json
-          draft: false
-          prerelease: false
+        run: |
+          TAG="scraping-$(date +%Y%m%d-%H%M%S)"
+          TITLE="📊 Scraping $(date +'%Y-%m-%d %H:%M')"
+          
+          # Crear release
+          gh release create "$TAG" \
+            --repo "${{ github.repository }}" \
+            --title "$TITLE" \
+            --notes "Archivos descargados del SICOES - Run #${{ github.run_number }}"
+          
+          # Subir archivos uno por uno
+          for f in descargas/*.docx descargas/*.pdf descargas/*.txt; do
+            if [ -f "$f" ]; then
+              echo "Subiendo: $f"
+              gh release upload "$TAG" "$f" --repo "${{ github.repository }}" --clobber
+            fi
+          done
+          
+          # Subir metadata
+          gh release upload "$TAG" descargas/_listado.json descargas/_manifest.json --repo "${{ github.repository }}" --clobber
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
